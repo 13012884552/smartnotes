@@ -1,0 +1,11 @@
+{
+  "name": "SmartNotes - 智能笔记助手",
+  "short_name": "SmartNotes",
+  "description": "笔记管理、拍照OCR、打卡提醒",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [{"src": "icon-192.png", "sizes": "192x192", "type": "image/png"}]
+}
