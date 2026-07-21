@@ -1,6 +1,6 @@
-// SmartNotes PWA v3
-const DB_NAME='smartnotes',DB_VER=3;
-let db,currentFolder=null,editingNoteId=null,viewingNoteId=null,ocrResultText='';
+// SmartNotes PWA v4
+const DB_NAME='smartnotes',DB_VER=4;
+let db,currentFolder=null,editingNoteId=null,viewingNoteId=null,ocrResultText='',isEditingDetail=false;
 
 function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,DB_VER);r.onupgradeneeded=e=>{const d=e.target.result;['notes','categories','reminders','checkins','schedule','settings','folders'].forEach(s=>{if(!d.objectStoreNames.contains(s))d.createObjectStore(s,{keyPath:s==='settings'?'key':'id',autoIncrement:s!=='settings'})})};r.onsuccess=e=>{db=e.target.result;resolve(db)};r.onerror=()=>reject(r.error)})}
 function tx(s,m='readonly'){return db.transaction(s,m).objectStore(s)}
@@ -42,13 +42,13 @@ function switchPage(page){
   if(page==='settings')renderSettings();
 }
 
-// (FAB is now two standalone buttons - no toggle needed)
-
 // ========= FOLDERS & NOTES LIST =========
 async function renderNotes(){
   try{
     const folders=(await sall('folders')).filter(f=>f.parentId===currentFolder);
     const notes=(await sall('notes')).filter(n=>n.folderId===currentFolder).sort((a,b)=>(b.updatedAt||b.createdAt)-(a.updatedAt||a.createdAt));
+    const cats=await sall('categories');
+
     // Breadcrumb
     let bc='<span class="tag selected" onclick="navigateToFolder(null)" style="cursor:pointer">🏠 全部</span>';
     if(currentFolder){
@@ -57,40 +57,41 @@ async function renderNotes(){
     }
     document.getElementById('categoryFilter').innerHTML=bc;
 
-    // Category quick filter
-    const cats=await sall('categories');
-    let catHTML='<div style="display:flex;gap:6px;overflow-x:auto;padding:8px 0;flex-wrap:wrap" id="catTags">';
-    catHTML+=cats.map(c=>'<span class="tag" style="cursor:pointer;white-space:nowrap" onclick="quickFilterCat(\''+esc(c.name)+'\')">'+esc(c.name)+'</span>').join('');
+    // Category quick filter tags
+    let catHTML='<div style="display:flex;gap:6px;overflow-x:auto;padding:8px 0;flex-wrap:wrap">';
+    catHTML+=cats.map(c=>'<span class="tag" style="cursor:pointer;white-space:nowrap" onclick="filterByCat('+c.id+')">'+esc(c.name)+'</span>').join('');
     catHTML+='</div>';
     document.getElementById('categoryFilter').innerHTML+=catHTML;
 
     let html='';
-    // Folders
     if(folders.length){
       html+='<div style="font-size:12px;color:var(--sub);margin:4px 0 8px">📁 文件夹</div>';
       html+=folders.map(f=>'<div class="card" style="cursor:pointer;display:flex;align-items:center;gap:10px" onclick="navigateToFolder('+f.id+')"><div style="font-size:24px">📁</div><div style="flex:1"><div style="font-weight:500">'+esc(f.name)+'</div></div><button style="background:none;border:none;color:var(--red);font-size:16px;padding:8px" onclick="event.stopPropagation();deleteFolder('+f.id+')">✕</button></div>').join('');
     }
-    // Notes
     if(notes.length){
       html+='<div style="font-size:12px;color:var(--sub);margin:12px 0 8px">📝 笔记</div>';
       html+=notes.map(n=>{
         const imgs=n.images||(n.image?[n.image]:[]);
-        const imgCount=imgs.length;
-        return '<div class="card" style="cursor:pointer" onclick="openNoteDetail('+n.id+')"><div style="font-weight:600;margin-bottom:4px">'+esc(n.title||'无标题')+'</div><div style="font-size:13px;color:var(--sub);line-height:1.5;max-height:45px;overflow:hidden">'+esc((n.content||'').substring(0,120))+'</div>'+(imgCount>0?'<div style="margin-top:8px;display:flex;gap:4px;overflow-x:auto">'+imgs.slice(0,4).map(img=>'<img src="'+img+'" style="width:50px;height:50px;border-radius:6px;object-fit:cover">').join('')+(imgCount>4?'<span style="font-size:12px;color:var(--sub);align-self:center">+'+String(imgCount-4)+'</span>':'')+'</div>':'')+'<div style="font-size:11px;color:var(--sub);margin-top:6px">'+formatDate(n.updatedAt||n.createdAt)+'</div></div>';
+        const cat=cats.find(c=>c.id===n.categoryId);
+        return '<div class="card" style="cursor:pointer" onclick="openNoteDetail('+n.id+')"><div style="display:flex;justify-content:space-between;align-items:start"><div style="font-weight:600;margin-bottom:4px;flex:1">'+esc(n.title||'无标题')+'</div>'+(cat?'<span class="tag">'+esc(cat.name)+'</span>':'')+'</div><div style="font-size:13px;color:var(--sub);line-height:1.5;max-height:45px;overflow:hidden">'+esc((n.content||'').substring(0,120))+'</div>'+(imgs.length?'<div style="margin-top:8px;display:flex;gap:4px;overflow-x:auto">'+imgs.slice(0,4).map(img=>'<img src="'+img+'" style="width:50px;height:50px;border-radius:6px;object-fit:cover">').join('')+(imgs.length>4?'<span style="font-size:12px;color:var(--sub);align-self:center">+'+String(imgs.length-4)+'</span>':'')+'</div>':'')+'<div style="font-size:11px;color:var(--sub);margin-top:6px">'+formatDate(n.updatedAt||n.createdAt)+'</div></div>';
       }).join('');
     }
     document.getElementById('notesList').innerHTML=html;
     document.getElementById('notesEmpty').style.display=(!folders.length&&!notes.length)?'block':'none';
-  }catch(e){console.error('renderNotes error:',e)}
+  }catch(e){console.error(e)}
 }
 
 function navigateToFolder(id){currentFolder=id;renderNotes()}
 async function getPath(fid){const r=[];let c=fid;while(c){const f=await sget('folders',c);if(!f||!f.parentId)break;const p=await sget('folders',f.parentId);if(!p)break;r.unshift(p);c=p.id}const s=await sget('folders',fid);if(s)r.push(s);return r}
 
-function quickFilterCat(name){
-  const notes=document.querySelectorAll('#notesList .card');
-  // Filter notes by creating a temporary note with category name and searching
-  alert('搜索分类: '+name+'\n(完整搜索功能需将分类关联到笔记)');
+async function filterByCat(catId){
+  // Filter notes in current folder by category
+  const all=(await sall('notes')).filter(n=>n.folderId===currentFolder&&n.categoryId===catId).sort((a,b)=>(b.updatedAt||b.createdAt)-(a.updatedAt||a.createdAt));
+  const cats=await sall('categories');const cat=cats.find(c=>c.id===catId);
+  let html='<div style="font-size:12px;color:var(--sub);margin:8px 0">筛选：'+esc(cat?cat.name:'')+' <span class="tag" onclick="renderNotes()" style="cursor:pointer">✕ 清除</span></div>';
+  if(!all.length){html+='<div class="empty-state"><p>该分类下暂无笔记</p></div>'}
+  else{html+=all.map(n=>{const imgs=n.images||[];return'<div class="card" style="cursor:pointer" onclick="openNoteDetail('+n.id+')"><div style="font-weight:600;margin-bottom:4px">'+esc(n.title||'无标题')+'</div><div style="font-size:13px;color:var(--sub);line-height:1.5;max-height:45px;overflow:hidden">'+esc((n.content||'').substring(0,120))+'</div>'+(imgs.length?'<div style="margin-top:8px;display:flex;gap:4px">'+imgs.slice(0,4).map(img=>'<img src="'+img+'" style="width:50px;height:50px;border-radius:6px;object-fit:cover">').join('')+'</div>':'')+'<div style="font-size:11px;color:var(--sub);margin-top:6px">'+formatDate(n.updatedAt||n.createdAt)+'</div></div>'}).join('')}
+  document.getElementById('notesList').innerHTML=html;document.getElementById('notesEmpty').style.display='none'
 }
 
 // ========= NEW FOLDER =========
@@ -100,18 +101,16 @@ async function newFolder(){
   await sput('folders',{name:name.trim(),parentId:currentFolder,createdAt:Date.now()});
   await renderNotes();
 }
-
 async function deleteFolder(id){
   const subs=(await sall('folders')).filter(f=>f.parentId===id);
   const notes=(await sall('notes')).filter(n=>n.folderId===id);
-  if((subs.length+notes.length)>0&&!confirm('此文件夹包含'+subs.length+'个子文件夹和'+notes.length+'个笔记，确定删除？'))return;
+  if((subs.length+notes.length)>0&&!confirm('包含'+subs.length+'个子文件夹和'+notes.length+'个笔记，确定删除？'))return;
   for(const f of subs)await deleteFolder(f.id);
   for(const n of notes)await sdel('notes',n.id);
-  await sdel('folders',id);
-  await renderNotes();
+  await sdel('folders',id);await renderNotes();
 }
 
-// ========= NEW NOTE =========
+// ========= NEW/EDIT NOTE (with category picker) =========
 async function newNote(){
   editingNoteId=null;
   document.getElementById('noteTitle').value='';
@@ -119,15 +118,22 @@ async function newNote(){
   document.getElementById('noteImages').innerHTML='';
   document.getElementById('noteImages').setAttribute('data-images','[]');
   showImagePicker();
+  await renderCatPicker(null);
   document.getElementById('noteOverlay').classList.add('show');
   document.getElementById('noteSheet').classList.add('open');
 }
-
 function hideNoteSheet(){
   document.getElementById('noteOverlay').classList.remove('show');
   document.getElementById('noteSheet').classList.remove('open');
 }
-
+async function renderCatPicker(selectedId){
+  const cats=await sall('categories');
+  document.getElementById('noteCategorySelect').innerHTML=cats.map(c=>'<span class="tag '+(c.id===selectedId?'selected':'')+'" data-cid="'+c.id+'" onclick="pickCat(this)">'+esc(c.name)+'</span>').join('');
+}
+function pickCat(el){
+  document.querySelectorAll('#noteCategorySelect .tag').forEach(t=>t.classList.remove('selected'));
+  el.classList.add('selected');
+}
 function showImagePicker(images){
   images=images||[];
   const c=document.getElementById('noteImages');
@@ -136,220 +142,152 @@ function showImagePicker(images){
   h+='<label style="display:inline-block;width:80px;height:80px;border:2px dashed var(--sep);border-radius:8px;cursor:pointer;text-align:center;line-height:80px;color:var(--sub);font-size:28px;margin:4px">+<input type="file" accept="image/*" multiple style="display:none" onchange="addPics(event)"></label>';
   c.innerHTML=h;
 }
-
 function addPics(e){
   const files=Array.from(e.target.files);
   if(!files.length)return;
   const c=document.getElementById('noteImages');
-  let images=JSON.parse(c.getAttribute('data-images')||'[]');
-  let loaded=0;
-  files.forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=ev=>{images.push(ev.target.result);loaded++;if(loaded===files.length){showImagePicker(images)}};
-    reader.readAsDataURL(file);
-  });
+  let images=JSON.parse(c.getAttribute('data-images')||'[]');let loaded=0;
+  files.forEach(file=>{const reader=new FileReader();reader.onload=ev=>{images.push(ev.target.result);loaded++;if(loaded===files.length)showImagePicker(images)};reader.readAsDataURL(file)});
 }
-
 function removePic(i){
   const c=document.getElementById('noteImages');
-  let images=JSON.parse(c.getAttribute('data-images')||'[]');
-  images.splice(i,1);
-  showImagePicker(images);
+  let images=JSON.parse(c.getAttribute('data-images')||'[]');images.splice(i,1);showImagePicker(images);
 }
-
 async function saveNote(){
   const title=document.getElementById('noteTitle').value.trim();
   const content=document.getElementById('noteContent').value.trim();
   const images=JSON.parse(document.getElementById('noteImages').getAttribute('data-images')||'[]');
-  const note={title,content,images:images.length>0?images:undefined,folderId:currentFolder,updatedAt:Date.now()};
-  if(editingNoteId){
-    const ex=await sget('notes',editingNoteId);
-    if(ex){note.createdAt=ex.createdAt;note.id=editingNoteId;await sput('notes',note)}
-  }else{note.createdAt=Date.now();await sput('notes',note)}
+  const sel=document.querySelector('#noteCategorySelect .tag.selected');
+  const catId=sel?parseInt(sel.dataset.cid):null;
+  const note={title,content,images:images.length>0?images:undefined,folderId:currentFolder,categoryId:catId,updatedAt:Date.now()};
+  if(editingNoteId){const ex=await sget('notes',editingNoteId);if(ex){note.createdAt=ex.createdAt;note.id=editingNoteId;await sput('notes',note)}}
+  else{note.createdAt=Date.now();await sput('notes',note)}
   hideNoteSheet();await renderNotes();
 }
-
 async function editNote(id){
-  const note=await sget('notes',id);
-  if(!note)return;
+  const note=await sget('notes',id);if(!note)return;
   editingNoteId=id;
   document.getElementById('noteTitle').value=note.title||'';
   document.getElementById('noteContent').value=note.content||'';
   showImagePicker(note.images||(note.image?[note.image]:[]));
+  await renderCatPicker(note.categoryId);
   document.getElementById('noteOverlay').classList.add('show');
   document.getElementById('noteSheet').classList.add('open');
 }
 
-// ========= NOTE DETAIL =========
+// ========= NOTE DETAIL (inline editing like Apple Notes) =========
 async function openNoteDetail(id){
-  const note=await sget('notes',id);
-  if(!note)return;
-  viewingNoteId=id;
+  const note=await sget('notes',id);if(!note)return;
+  viewingNoteId=id;isEditingDetail=false;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  const dp=document.getElementById('page-note-detail');
-  dp.style.display='block';dp.classList.add('active');
+  const dp=document.getElementById('page-note-detail');dp.style.display='block';dp.classList.add('active');
   document.getElementById('nav').style.display='none';
   document.getElementById('headerTitle').style.display='none';
   const f=document.getElementById('fabContainer');if(f)f.classList.add('hidden');
-  document.getElementById('noteDetailDate').textContent=formatDate(note.updatedAt||note.createdAt);
-  const imgs=note.images||(note.image?[note.image]:[]);
-  document.getElementById('noteDetailContent').innerHTML='<div class="note-detail-title">'+esc(note.title||'无标题')+'</div><div class="note-detail-body">'+esc(note.content||'')+'</div>'+(imgs.length?imgs.map((img,i)=>'<img src="'+img+'" class="note-detail-img" onclick="fullImg(this.src)" style="max-height:400px;object-fit:contain;background:#111">').join(''):'');
+  renderDetailView(note);
 }
-
+function renderDetailView(note){
+  const cats=[];sall('categories').then(c=>{const cat=c.find(x=>x.id===note.categoryId);document.getElementById('noteDetailMeta').textContent=(cat?'📂 '+cat.name+' · ':'')+formatDate(note.updatedAt||note.createdAt)});
+  document.getElementById('noteDetailMeta').textContent=formatDate(note.updatedAt||note.createdAt);
+  document.getElementById('noteDetailTitle').textContent=note.title||'无标题';
+  document.getElementById('noteDetailTitle').contentEditable='false';
+  document.getElementById('noteDetailBody').textContent=note.content||'';
+  document.getElementById('noteDetailBody').contentEditable='false';
+  const imgs=note.images||(note.image?[note.image]:[]);
+  document.getElementById('noteDetailImages').innerHTML=imgs.length?imgs.map((img,i)=>'<img src="'+img+'" onclick="fullImg(this.src)" style="width:100%;border-radius:12px;margin:6px 0;max-height:400px;object-fit:contain;background:#111;cursor:pointer">').join(''):'';
+  document.getElementById('editBtn').style.display='';document.getElementById('doneBtn').style.display='none';
+}
+async function toggleEditDetail(){
+  if(!viewingNoteId)return;
+  if(isEditingDetail){
+    // Save changes
+    const note=await sget('notes',viewingNoteId);if(!note)return;
+    note.title=document.getElementById('noteDetailTitle').textContent.trim();
+    note.content=document.getElementById('noteDetailBody').textContent.trim();
+    note.updatedAt=Date.now();
+    await sput('notes',note);
+    isEditingDetail=false;
+    document.getElementById('noteDetailTitle').contentEditable='false';
+    document.getElementById('noteDetailBody').contentEditable='false';
+    document.getElementById('editBtn').style.display='';document.getElementById('doneBtn').style.display='none';
+    renderDetailView(note);
+    renderNotes();
+  }else{
+    // Enter edit mode
+    isEditingDetail=true;
+    document.getElementById('noteDetailTitle').contentEditable='true';
+    document.getElementById('noteDetailBody').contentEditable='true';
+    document.getElementById('noteDetailTitle').focus();
+    document.getElementById('editBtn').style.display='none';document.getElementById('doneBtn').style.display='';
+  }
+}
 function closeNoteDetail(){
+  if(isEditingDetail) toggleEditDetail();
   document.getElementById('page-note-detail').style.display='none';
   document.getElementById('page-note-detail').classList.remove('active');
   document.getElementById('nav').style.display='flex';
   document.getElementById('headerTitle').style.display='';
-  viewingNoteId=null;
+  viewingNoteId=null;isEditingDetail=false;
   switchPage('notes');
 }
-
-function editFromDetail(){if(viewingNoteId){closeNoteDetail();editNote(viewingNoteId)}}
 function deleteFromDetail(){if(viewingNoteId&&confirm('确定删除？')){sdel('notes',viewingNoteId);viewingNoteId=null;closeNoteDetail()}}
 function fullImg(src){const d=document.createElement('div');d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:999;display:flex;align-items:center;justify-content:center';d.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:100%;object-fit:contain">';d.onclick=()=>d.remove();document.body.appendChild(d)}
 
 // ========= CAMERA / OCR =========
 async function handleCamera(e){
-  const file=e.target.files[0];
-  if(!file)return;
+  const file=e.target.files[0];if(!file)return;
   const preview=document.getElementById('ocrPreview');
   const url=URL.createObjectURL(file);
-  preview.innerHTML='<img src="'+url+'" class="photo-preview" style="max-height:250px"><div style="padding:12px;color:var(--sub)">🔍 正在识别文字...</div>';
+  preview.innerHTML='<img src="'+url+'" class="photo-preview" style="max-height:250px"><div style="padding:12px;color:var(--sub)">🔍 正在识别...</div>';
   try{
     const worker=await Tesseract.recognize(file,'chi_sim+eng',{logger:m=>{if(m.status==='recognizing text')preview.querySelector('div').textContent='🔍 识别中... '+Math.round(m.progress*100)+'%'}});
     ocrResultText=worker.data.text.trim();
-    preview.innerHTML='<img src="'+url+'" class="photo-preview" style="max-height:120px"><div class="ocr-result">'+esc(ocrResultText||'(未识别到文字)')+'</div><button class="btn" onclick="saveOCR()" style="margin-top:8px">📝 保存到当前文件夹</button><button class="btn-outline" onclick="document.getElementById(\'ocrPreview\').innerHTML=\'\';ocrResultText=\'\'" style="margin-top:4px;width:100%">取消</button>';
+    preview.innerHTML='<img src="'+url+'" class="photo-preview" style="max-height:120px"><div class="ocr-result">'+esc(ocrResultText||'(未识别到文字)')+'</div><button class="btn" onclick="saveOCR()" style="margin-top:8px">📝 保存</button><button class="btn-outline" onclick="document.getElementById(\'ocrPreview\').innerHTML=\'\'" style="margin-top:4px;width:100%">取消</button>';
   }catch(err){preview.innerHTML='<div style="color:var(--red);padding:12px">识别失败：'+esc(err.message)+'</div>'}
 }
-
 async function saveOCR(){
   if(!ocrResultText)return;
   await sput('notes',{title:ocrResultText.substring(0,40),content:ocrResultText,folderId:currentFolder,createdAt:Date.now(),updatedAt:Date.now()});
-  ocrResultText='';
-  document.getElementById('ocrPreview').innerHTML='<div style="color:var(--green);padding:20px">✅ 已保存！</div>';
-  await renderNotes();
+  ocrResultText='';document.getElementById('ocrPreview').innerHTML='<div style="color:var(--green);padding:20px">✅ 已保存！</div>';await renderNotes();
 }
 
 // ========= CHECK-IN & CHECK-OUT =========
 async function renderCheckin(){
-  updateClock();
-  const st=await sall('settings');
-  const workTime=(st.find(s=>s.key==='workStartTime')||{}).value||'08:00';
-  const today=new Date().toISOString().split('T')[0];
-  const checkins=await sall('checkins');
-  const todayCI=checkins.filter(c=>c.date===today);
-  const status=document.getElementById('checkinStatus');
-  const inBtn=document.getElementById('checkinBtn');
-  const outBtn=document.getElementById('checkoutBtn');
-  const workInfo=document.getElementById('todayWorkTime');
-
-  if(todayCI.length>0){
-    const ci=todayCI[0];
-    if(ci.checkoutTime){
-      status.innerHTML='<span class="checkin-dot ok"></span> ✅ 今日已完成';
-      inBtn.textContent='✅ '+ci.time;inBtn.style.background='var(--green)';inBtn.disabled=true;
-      outBtn.textContent='🏠 '+ci.checkoutTime;outBtn.style.background='var(--green)';outBtn.style.display='block';outBtn.disabled=true;
-      const mh=calcMins(ci.time,ci.checkoutTime);
-      workInfo.textContent='⏱ 工时：'+Math.floor(mh/60)+'h'+String(mh%60)+'m';
-    }else{
-      const onTime=ci.time<=workTime;
-      status.innerHTML='<span class="checkin-dot '+(onTime?'ok':'late')+'"></span> 已打卡 '+ci.time+' '+(onTime?'✅ 准时':'⚠️ 迟到');
-      inBtn.textContent='✅ '+ci.time;inBtn.style.background='var(--green)';inBtn.disabled=true;
-      outBtn.textContent='🏠 下班签退';outBtn.style.background='var(--blue)';outBtn.style.display='block';outBtn.disabled=false;
-      const mh=calcMins(ci.time);
-      workInfo.textContent='⏱ 已工作：'+Math.floor(mh/60)+'h'+String(mh%60)+'m';
-    }
-  }else{
-    const[h,m]=workTime.split(':').map(Number);
-    const d=new Date();d.setHours(h,m,0);
-    status.innerHTML=new Date()>d?'<span class="checkin-dot miss"></span> ⚠️ 已过上班时间':'<span style="color:var(--sub)">还未打卡</span>';
-    inBtn.textContent='✅ 上班打卡';inBtn.style.background='var(--accent)';inBtn.disabled=false;
-    outBtn.style.display='none';workInfo.textContent='';
-  }
-
+  updateClock();const st=await sall('settings');const workTime=(st.find(s=>s.key==='workStartTime')||{}).value||'08:00';
+  const today=new Date().toISOString().split('T')[0];const checkins=await sall('checkins');const todayCI=checkins.filter(c=>c.date===today);
+  const status=document.getElementById('checkinStatus'),inBtn=document.getElementById('checkinBtn'),outBtn=document.getElementById('checkoutBtn'),workInfo=document.getElementById('todayWorkTime');
+  if(todayCI.length>0){const ci=todayCI[0];
+    if(ci.checkoutTime){status.innerHTML='<span class="checkin-dot ok"></span> ✅ 今日已完成';inBtn.textContent='✅ '+ci.time;inBtn.style.background='var(--green)';inBtn.disabled=true;outBtn.textContent='🏠 '+ci.checkoutTime;outBtn.style.background='var(--green)';outBtn.style.display='block';outBtn.disabled=true;const mh=calcMins(ci.time,ci.checkoutTime);workInfo.textContent='⏱ 工时：'+Math.floor(mh/60)+'h'+String(mh%60)+'m'}
+    else{const onTime=ci.time<=workTime;status.innerHTML='<span class="checkin-dot '+(onTime?'ok':'late')+'"></span> 已打卡 '+ci.time+' '+(onTime?'✅ 准时':'⚠️ 迟到');inBtn.textContent='✅ '+ci.time;inBtn.style.background='var(--green)';inBtn.disabled=true;outBtn.textContent='🏠 下班签退';outBtn.style.background='var(--blue)';outBtn.style.display='block';outBtn.disabled=false;const mh=calcMins(ci.time);workInfo.textContent='⏱ 已工作：'+Math.floor(mh/60)+'h'+String(mh%60)+'m'}
+  }else{const[h,m]=workTime.split(':').map(Number);const d=new Date();d.setHours(h,m,0);status.innerHTML=new Date()>d?'<span class="checkin-dot miss"></span> ⚠️ 已过上班时间':'<span style="color:var(--sub)">还未打卡</span>';inBtn.textContent='✅ 上班打卡';inBtn.style.background='var(--accent)';inBtn.disabled=false;outBtn.style.display='none';workInfo.textContent=''}
   const recent=checkins.sort((a,b)=>b.timestamp-a.timestamp).slice(0,7);
-  document.getElementById('checkinHistory').innerHTML=recent.length?recent.map(c=>{const l=c.date+' '+c.dayOfWeek+' 上班 '+c.time+(c.checkoutTime?' → '+c.checkoutTime:'');const ot=c.time<=workTime;return'<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--sep);font-size:14px"><span>'+l+'</span><span style="color:'+(ot?'var(--green)':'var(--orange)')+';font-size:12px">'+(ot?'准时':'迟到')+'</span></div>'}).join(''):'<div style="color:var(--sub);font-size:13px">暂无记录</div>';
+  document.getElementById('checkinHistory').innerHTML=recent.length?recent.map(c=>{const l=c.date+' '+c.dayOfWeek+' 上班 '+c.time+(c.checkoutTime?' → '+c.checkoutTime:'');return'<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--sep);font-size:14px"><span>'+l+'</span><span style="color:'+(c.time<=workTime?'var(--green)':'var(--orange)')+';font-size:12px">'+(c.time<=workTime?'准时':'迟到')+'</span></div>'}).join(''):'<div style="color:var(--sub);font-size:13px">暂无记录</div>';
   renderTodaySchedule();
 }
-
 function calcMins(start,end){const[sH,sM]=start.split(':').map(Number);if(end){const[eH,eM]=end.split(':').map(Number);return(eH*60+eM)-(sH*60+sM)}const now=new Date();return(now.getHours()*60+now.getMinutes())-(sH*60+sM)}
-
-async function doCheckin(){
-  const now=new Date();
-  const days=['周日','周一','周二','周三','周四','周五','周六'];
-  await sput('checkins',{date:now.toISOString().split('T')[0],time:now.toTimeString().slice(0,5),dayOfWeek:days[now.getDay()],timestamp:now.getTime()});
-  await renderCheckin();
-}
-
-async function doCheckout(){
-  const today=new Date().toISOString().split('T')[0];
-  const checkins=await sall('checkins');
-  const ci=checkins.find(c=>c.date===today);
-  if(ci){ci.checkoutTime=new Date().toTimeString().slice(0,5);await sput('checkins',ci)}
-  await renderCheckin();
-}
-
-async function renderTodaySchedule(){
-  const schedule=await sall('schedule');
-  const todayStr=new Date().toISOString().split('T')[0];
-  const items=schedule.filter(s=>{try{return new Date(s.date).toISOString().split('T')[0]===todayStr}catch(e){return false}});
-  document.getElementById('todaySchedule').innerHTML=items.length?items.map(s=>'<div class="schedule-day"><div style="font-weight:500">📍 '+esc(s.location||'未指定')+'</div><div style="font-size:12px;color:var(--sub);margin-top:2px">🕐 '+esc(s.shift||'')+' | 🔧 '+esc(s.task||'')+'</div></div>').join(''):'<div style="color:var(--sub);font-size:13px">暂无今日排班</div>';
-}
-
-function updateClock(){
-  const now=new Date();
-  const days=['周日','周一','周二','周三','周四','周五','周六'];
-  const te=document.getElementById('currentTime'),de=document.getElementById('currentDate');
-  if(te)te.textContent=now.toTimeString().slice(0,5);
-  if(de)de.textContent=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+days[now.getDay()];
-}
+async function doCheckin(){const now=new Date();const days=['周日','周一','周二','周三','周四','周五','周六'];await sput('checkins',{date:now.toISOString().split('T')[0],time:now.toTimeString().slice(0,5),dayOfWeek:days[now.getDay()],timestamp:now.getTime()});await renderCheckin()}
+async function doCheckout(){const today=new Date().toISOString().split('T')[0];const checkins=await sall('checkins');const ci=checkins.find(c=>c.date===today);if(ci){ci.checkoutTime=new Date().toTimeString().slice(0,5);await sput('checkins',ci)}await renderCheckin()}
+async function renderTodaySchedule(){const schedule=await sall('schedule');const todayStr=new Date().toISOString().split('T')[0];const items=schedule.filter(s=>{try{return new Date(s.date).toISOString().split('T')[0]===todayStr}catch(e){return false}});document.getElementById('todaySchedule').innerHTML=items.length?items.map(s=>'<div class="schedule-day"><div style="font-weight:500">📍 '+esc(s.location||'未指定')+'</div><div style="font-size:12px;color:var(--sub);margin-top:2px">🕐 '+esc(s.shift||'')+' | 🔧 '+esc(s.task||'')+'</div></div>').join(''):'<div style="color:var(--sub);font-size:13px">暂无今日排班</div>'}
+function updateClock(){const now=new Date();const days=['周日','周一','周二','周三','周四','周五','周六'];const te=document.getElementById('currentTime'),de=document.getElementById('currentDate');if(te)te.textContent=now.toTimeString().slice(0,5);if(de)de.textContent=now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+days[now.getDay()]}
 
 // ========= REMINDERS =========
-async function renderReminders(){
-  const reminders=await sall('reminders');
-  document.getElementById('remindersEmpty').style.display=reminders.length?'none':'block';
-  document.getElementById('remindersList').innerHTML=reminders.length?reminders.map(r=>'<div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:500">'+esc(r.title)+'</div><div style="font-size:12px;color:var(--sub)">🕐 '+r.time+' · '+(r.type==='daily'?'每天':r.type==='weekday'?'工作日':'一次性')+'</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:'+(r.enabled?'var(--green)':'var(--sub)')+'">'+(r.enabled?'开':'关')+'</span><button class="btn-sm" style="background:var(--red);font-size:11px;padding:4px 10px" onclick="sdel(\'reminders\','+r.id+').then(()=>renderReminders())">✕</button></div></div>').join(''):'';
-}
+async function renderReminders(){const reminders=await sall('reminders');document.getElementById('remindersEmpty').style.display=reminders.length?'none':'block';document.getElementById('remindersList').innerHTML=reminders.length?reminders.map(r=>'<div class="card" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:500">'+esc(r.title)+'</div><div style="font-size:12px;color:var(--sub)">🕐 '+r.time+' · '+(r.type==='daily'?'每天':r.type==='weekday'?'工作日':'一次性')+'</div></div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:'+(r.enabled?'var(--green)':'var(--sub)')+'">'+(r.enabled?'开':'关')+'</span><button class="btn-sm" style="background:var(--red);font-size:11px;padding:4px 10px" onclick="sdel(\'reminders\','+r.id+').then(()=>renderReminders())">✕</button></div></div>').join(''):''}
+function addReminderSheet(){document.getElementById('reminderTitle').value='';document.getElementById('reminderTime').value='08:00';document.getElementById('reminderType').value='daily';document.getElementById('reminderEnabled').checked=true;document.getElementById('reminderOverlay').classList.add('show');document.getElementById('reminderSheet').classList.add('open')}
+function hideReminderSheet(){document.getElementById('reminderOverlay').classList.remove('show');document.getElementById('reminderSheet').classList.remove('open')}
+async function saveReminder(){const title=document.getElementById('reminderTitle').value.trim();if(!title)return;await sput('reminders',{title,time:document.getElementById('reminderTime').value,type:document.getElementById('reminderType').value,enabled:document.getElementById('reminderEnabled').checked});hideReminderSheet();await renderReminders()}
+function checkReminders(){if(!('Notification' in window)||Notification.permission!=='granted')return;const now=new Date(),ts=now.toTimeString().slice(0,5),day=now.getDay();sall('reminders').then(rs=>rs.filter(r=>r.enabled&&r.time===ts).forEach(r=>{if(r.type==='daily'||(r.type==='weekday'&&day>=1&&day<=5)||r.type==='once'){new Notification('SmartNotes',{body:r.title,icon:'icon-192.png'});if(r.type==='once')sput('reminders',{...r,enabled:false})}}))}
 
-function addReminderSheet(){
-  document.getElementById('reminderTitle').value='';
-  document.getElementById('reminderTime').value='08:00';
-  document.getElementById('reminderType').value='daily';
-  document.getElementById('reminderEnabled').checked=true;
-  document.getElementById('reminderOverlay').classList.add('show');
-  document.getElementById('reminderSheet').classList.add('open');
-}
-function hideReminderSheet(){
-  document.getElementById('reminderOverlay').classList.remove('show');
-  document.getElementById('reminderSheet').classList.remove('open');
-}
-async function saveReminder(){
-  const title=document.getElementById('reminderTitle').value.trim();
-  if(!title)return;
-  await sput('reminders',{title,time:document.getElementById('reminderTime').value,type:document.getElementById('reminderType').value,enabled:document.getElementById('reminderEnabled').checked});
-  hideReminderSheet();await renderReminders();
-}
-
-function checkReminders(){
-  if(!('Notification' in window)||Notification.permission!=='granted')return;
-  const now=new Date(),ts=now.toTimeString().slice(0,5),day=now.getDay();
-  sall('reminders').then(rs=>rs.filter(r=>r.enabled&&r.time===ts).forEach(r=>{if(r.type==='daily'||(r.type==='weekday'&&day>=1&&day<=5)||r.type==='once'){new Notification('SmartNotes',{body:r.title,icon:'icon-192.png'});if(r.type==='once')sput('reminders',{...r,enabled:false})}}));
-}
-
-// ========= SCHEDULE IMPORT =========
+// ========= SCHEDULE IMPORT (with keyword filter) =========
 async function importSchedule(e){
-  const file=e.target.files[0];
-  if(!file)return;
-  const status=document.getElementById('scheduleStatus');
-  status.textContent='正在解析...';
+  const file=e.target.files[0];if(!file)return;
+  const keyword=prompt('输入筛选关键词（如地点名、人名等，留空则全部导入）：');
+  const status=document.getElementById('scheduleStatus');status.textContent='正在解析...';
   try{
-    const data=await file.arrayBuffer();
-    const wb=XLSX.read(data,{type:'array'});
-    await sclr('schedule');let imported=0;
+    const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array'});
+    const kw=keyword?keyword.trim().toLowerCase():'';
+    await sclr('schedule');let imported=0,skipped=0;
     for(const name of wb.SheetNames){
-      const ws=wb.Sheets[name];
-      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      const ws=wb.Sheets[name];const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
       if(rows.length<2)continue;
       for(let i=0;i<Math.min(rows.length,5);i++){
         for(let j=0;j<rows[i].length;j++){
@@ -360,6 +298,8 @@ async function importSchedule(e){
               const tc=String(rows[k][j]||'');
               if(tc&&tc!=='周末'&&tc!=='休息'){
                 const rl=String(rows[k][0]||'');
+                // Apply keyword filter
+                if(kw&&!tc.toLowerCase().includes(kw)&&!rl.toLowerCase().includes(kw)&&!name.toLowerCase().includes(kw)){skipped++;continue}
                 await sput('schedule',{date:ds,sheet:name,location:name.split('-')[0]||'未分类',shift:rl.includes('夜班')?'夜班':rl.includes('中班')?'中班':'白班',task:tc.substring(0,200)});
                 imported++;
               }
@@ -368,7 +308,7 @@ async function importSchedule(e){
         }
       }
     }
-    status.textContent='✅ 导入 '+imported+' 条记录！';
+    status.textContent='✅ 导入 '+imported+' 条'+(kw?'（跳过 '+skipped+' 条不匹配）':'')+'！';
     setTimeout(()=>renderCheckin(),500);
   }catch(err){status.textContent='❌ 解析失败：'+err.message}
 }
@@ -377,25 +317,12 @@ async function importSchedule(e){
 async function renderSettings(){
   const cats=await sall('categories');
   document.getElementById('categoryList').innerHTML=cats.map(c=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--sep);font-size:14px"><span>'+esc(c.name)+'</span><button style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px" onclick="sdel(\'categories\','+c.id+').then(()=>renderSettings())">✕</button></div>').join('');
-  const st=await sall('settings');
-  const wt=st.find(s=>s.key==='workStartTime');
-  if(wt)document.getElementById('workStartTime').value=wt.value;
-  const schedule=await sall('schedule');
-  document.getElementById('scheduleStatus').textContent=schedule.length?'已导入 '+schedule.length+' 条记录':'尚未导入';
+  const st=await sall('settings');const wt=st.find(s=>s.key==='workStartTime');if(wt)document.getElementById('workStartTime').value=wt.value;
+  const schedule=await sall('schedule');document.getElementById('scheduleStatus').textContent=schedule.length?'已导入 '+schedule.length+' 条记录':'尚未导入';
 }
-async function addCategory(){
-  const n=document.getElementById('newCategoryInput').value.trim();
-  if(!n)return;
-  await sput('categories',{name:n});
-  document.getElementById('newCategoryInput').value='';
-  await renderSettings();await renderNotes();
-}
+async function addCategory(){const n=document.getElementById('newCategoryInput').value.trim();if(!n)return;await sput('categories',{name:n});document.getElementById('newCategoryInput').value='';await renderSettings();await renderNotes()}
 async function saveSettings(){await sput('settings',{key:'workStartTime',value:document.getElementById('workStartTime').value})}
-async function exportData(){
-  const data={notes:await sall('notes'),checkins:await sall('checkins'),schedule:await sall('schedule'),folders:await sall('folders'),exportedAt:new Date().toISOString()};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='smartnotes-backup.json';a.click();
-}
+async function exportData(){const data={notes:await sall('notes'),checkins:await sall('checkins'),schedule:await sall('schedule'),folders:await sall('folders'),exportedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='smartnotes-backup.json';a.click()}
 async function clearAll(){for(const s of['notes','checkins','reminders','schedule','folders'])await sclr(s);alert('已清除');location.reload()}
 
 // ========= HELPERS =========
