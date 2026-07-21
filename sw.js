@@ -1,4 +1,4 @@
-const CACHE = 'smartnotes-v4';
+const CACHE = 'smartnotes-v5';
 const ASSETS = [
   '/',
   'index.html',
