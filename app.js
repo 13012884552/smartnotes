@@ -34,21 +34,15 @@ function switchPage(page){
   const isDetail=(page==='note-detail');
   document.getElementById('nav').style.display=isDetail?'none':'flex';
   document.getElementById('headerTitle').style.display=isDetail?'none':'';
-  const fab=document.getElementById('fab'),fm=document.getElementById('fabMenu'),fo=document.getElementById('fabOverlay');
-  if(page==='notes'){fab.classList.remove('hidden');currentFolder=null;renderNotes()}
-  else{fab.classList.add('hidden');if(fm)fm.classList.remove('open');if(fo)fo.classList.remove('show')}
+  const fab=document.getElementById('fabContainer');
+  if(page==='notes'){if(fab)fab.classList.remove('hidden');currentFolder=null;renderNotes()}
+  else{if(fab)fab.classList.add('hidden')}
   if(page==='checkin')renderCheckin();
   if(page==='reminders')renderReminders();
   if(page==='settings')renderSettings();
 }
 
-// ========= FAB MENU =========
-function toggleFabMenu(){
-  const m=document.getElementById('fabMenu'),o=document.getElementById('fabOverlay');
-  if(!m||!o)return;
-  if(m.classList.contains('open')){m.classList.remove('open');o.classList.remove('show')}
-  else{m.classList.add('open');o.classList.add('show')}
-}
+// (FAB is now two standalone buttons - no toggle needed)
 
 // ========= FOLDERS & NOTES LIST =========
 async function renderNotes(){
@@ -196,7 +190,7 @@ async function openNoteDetail(id){
   dp.style.display='block';dp.classList.add('active');
   document.getElementById('nav').style.display='none';
   document.getElementById('headerTitle').style.display='none';
-  document.getElementById('fab').classList.add('hidden');
+  const f=document.getElementById('fabContainer');if(f)f.classList.add('hidden');
   document.getElementById('noteDetailDate').textContent=formatDate(note.updatedAt||note.createdAt);
   const imgs=note.images||(note.image?[note.image]:[]);
   document.getElementById('noteDetailContent').innerHTML='<div class="note-detail-title">'+esc(note.title||'无标题')+'</div><div class="note-detail-body">'+esc(note.content||'')+'</div>'+(imgs.length?imgs.map((img,i)=>'<img src="'+img+'" class="note-detail-img" onclick="fullImg(this.src)" style="max-height:400px;object-fit:contain;background:#111">').join(''):'');
