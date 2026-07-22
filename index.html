@@ -10,65 +10,86 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-:root{--bg:#000;--card:#1c1c1e;--sheet:#1c1c1e;--sep:#38383a;--text:#fff;--sub:#8e8e93;--blue:#0a84ff;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--accent:#ff9f0a;--radius:12px;--nav-h:84px;safe-area-inset-bottom:env(safe-area-inset-bottom,20px)}
+:root{--bg:#000;--card:#1c1c1e;--sep:#38383a;--text:#fff;--sub:#8e8e93;--blue:#0a84ff;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--accent:#ff9f0a;--radius:12px}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;user-select:none;-webkit-user-select:none}
 .app{height:100vh;display:flex;flex-direction:column}
 .header{text-align:center;padding:14px 16px 10px;font-size:17px;font-weight:600;background:var(--bg);border-bottom:0.5px solid var(--sep);z-index:10}
-.page{flex:1;overflow-y:auto;padding:12px 16px 120px;display:none;-webkit-overflow-scrolling:touch}
+.page{flex:1;overflow-y:auto;padding:12px 16px 100px;display:none;-webkit-overflow-scrolling:touch}
 .page.active{display:block}
 .nav{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:0.5px solid var(--sep);display:flex;padding:8px 0 env(safe-area-inset-bottom,20px);z-index:100}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--sub);font-size:10px;cursor:pointer;padding:4px 0;transition:color .15s}
 .nav-item.active{color:var(--accent)}
 .nav-item svg{width:24px;height:24px}
-.card{background:var(--card);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.card{background:var(--card);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden}
 .btn{background:var(--accent);color:#000;border:none;padding:12px 24px;border-radius:24px;font-size:16px;font-weight:600;cursor:pointer;width:100%}
 .btn-sm{background:var(--accent);color:#000;border:none;padding:8px 16px;border-radius:16px;font-size:13px;font-weight:600;cursor:pointer}
-.btn-outline{background:transparent;color:var(--accent);border:1px solid var(--accent);padding:10px 20px;border-radius:20px;font-size:14px;cursor:pointer}
+.btn-outline{background:transparent;color:var(--accent);border:1px solid var(--accent);padding:10px 20px;border-radius:20px;font-size:14px;cursor:pointer;display:block;width:100%;text-align:center}
 .input{width:100%;background:var(--card);border:1px solid var(--sep);border-radius:var(--radius);padding:12px 14px;color:var(--text);font-size:15px;outline:none}
 .input:focus{border-color:var(--accent)}
 textarea.input{min-height:80px;resize:vertical;font-family:inherit}
-.tag{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;margin:2px 4px 2px 0;background:rgba(255,159,10,.2);color:var(--accent)}
+.tag{display:inline-block;padding:4px 10px;border-radius:12px;font-size:12px;margin:2px 4px 2px 0;background:rgba(255,159,10,.2);color:var(--accent);cursor:pointer;white-space:nowrap}
 .tag.selected{background:var(--accent);color:#000}
-.fab{position:fixed;bottom:110px;right:20px;width:56px;height:56px;border-radius:28px;background:var(--accent);color:#000;border:none;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(255,159,10,.4);z-index:50;cursor:pointer}
-.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--sheet);border-radius:20px 20px 0 0;padding:20px 20px env(safe-area-inset-bottom,30px);z-index:200;transform:translateY(100%);transition:transform .3s ease}
+.fab-container{position:fixed;bottom:110px;right:20px;z-index:50;display:flex;flex-direction:column;gap:12px;align-items:flex-end}
+.fab{width:56px;height:56px;border-radius:28px;border:none;font-size:24px;box-shadow:0 4px 20px rgba(255,159,10,.4);cursor:pointer;color:#000}
+.fab-note{background:var(--blue);color:#fff}
+.fab-folder{background:var(--accent);color:#000}
+.photo-preview{width:100%;border-radius:var(--radius);max-height:200px;object-fit:contain;background:#111;margin:8px 0}
+.ocr-result{background:var(--card);border-radius:var(--radius);padding:12px;margin:8px 0;font-size:14px;line-height:1.6;max-height:200px;overflow-y:auto;white-space:pre-wrap}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-radius:20px 20px 0 0;padding:20px 20px env(safe-area-inset-bottom,30px);z-index:200;transform:translateY(100%);transition:transform .3s ease;max-height:85vh;overflow-y:auto}
 .sheet.open{transform:translateY(0)}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;display:none}
 .overlay.show{display:block}
-.photo-preview{width:100%;border-radius:var(--radius);max-height:200px;object-fit:contain;background:#111;margin:8px 0}
-.ocr-result{background:var(--card);border-radius:var(--radius);padding:12px;margin:8px 0;font-size:14px;line-height:1.6;max-height:200px;overflow-y:auto;white-space:pre-wrap}
-.checkin-dot{width:12px;height:12px;border-radius:6px;display:inline-block;margin-right:8px}.checkin-dot.ok{background:var(--green)}.checkin-dot.late{background:var(--orange)}.checkin-dot.miss{background:var(--red)}
+.checkin-dot{width:12px;height:12px;border-radius:6px;display:inline-block;margin-right:8px}
+.checkin-dot.ok{background:var(--green)}.checkin-dot.late{background:var(--orange)}.checkin-dot.miss{background:var(--red)}
 .schedule-day{padding:10px;border-radius:8px;margin:4px 0;background:var(--card);border-left:3px solid var(--accent)}
 .empty-state{text-align:center;padding:60px 20px;color:var(--sub)}
-.empty-state svg{width:60px;height:60px;margin-bottom:12px;opacity:.5}
-.note-detail-title{font-size:22px;font-weight:700;margin-bottom:12px;line-height:1.3}
-.note-detail-body{font-size:16px;line-height:1.8;white-space:pre-wrap;margin-bottom:20px}
-.note-detail-img{width:100%;border-radius:var(--radius);margin:8px 0;cursor:pointer}
-#fabMenu.open{display:flex!important}
-#fabOverlay.show{display:block!important}
+
+/* Search bar */
+.search-bar{display:flex;align-items:center;background:var(--card);border-radius:10px;padding:8px 12px;margin-bottom:12px;gap:8px}
+.search-bar input{flex:1;background:none;border:none;color:var(--text);font-size:15px;outline:none}
+.search-bar input::placeholder{color:var(--sub)}
+
+/* Swipe to delete */
+.swipe-wrapper{position:relative;overflow:hidden;border-radius:var(--radius);margin-bottom:10px}
+.swipe-content{position:relative;z-index:1;transition:transform .2s ease}
+.swipe-delete{position:absolute;right:0;top:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;cursor:pointer;border-radius:0 var(--radius) var(--radius) 0}
+
+/* Reminder checkbox */
+.reminder-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:0.5px solid var(--sep)}
+.check-circle{width:24px;height:24px;border-radius:12px;border:2px solid var(--sep);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.check-circle.done{background:var(--green);border-color:var(--green)}
+.check-circle.done::after{content:'✓';color:#fff;font-size:14px;font-weight:700}
+.reminder-text{flex:1;font-size:15px}.reminder-text.done{color:var(--sub);text-decoration:line-through}
+
+/* Bottom toolbar */
+.bottom-toolbar{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:0.5px solid var(--sep);display:flex;justify-content:space-around;padding:10px 0 env(safe-area-inset-bottom,20px);z-index:100}
+
+/* File preview */
+.file-preview{padding:16px;background:var(--card);border-radius:var(--radius);margin:10px 0;max-height:400px;overflow-y:auto;font-size:14px;line-height:1.7}
+.file-preview img{max-width:100%}
 .hidden{display:none!important}
 @media(min-width:768px){.page{max-width:600px;margin:0 auto}}
 </style>
 </head>
 <body>
-<div class="app" id="app">
-  <div class="header" id="headerTitle">SmartNotes</div>
+<div class="app">
+  <div class="header" id="headerTitle">📒 笔记</div>
 
   <!-- Notes Page -->
   <div class="page active" id="page-notes">
-    <div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px;flex-wrap:wrap;align-items:center" id="categoryFilter"></div>
+    <div class="search-bar"><span style="color:var(--sub)">🔍</span><input type="search" id="searchInput" placeholder="搜索笔记..." oninput="renderNotes()"></div>
+    <div style="display:flex;gap:6px;overflow-x:auto;padding:4px 0 10px;flex-wrap:wrap" id="categoryFilter"></div>
     <div id="notesList"></div>
-    <div class="empty-state" id="notesEmpty"><div style="font-size:48px;margin-bottom:12px">📒</div><p>还没有笔记</p><p style="font-size:13px;color:var(--sub)">点击右下角 + 创建笔记或文件夹</p></div>
+    <div class="empty-state" id="notesEmpty"><div style="font-size:48px;margin-bottom:12px">📒</div><p>还没有笔记</p></div>
   </div>
 
   <!-- Camera Page -->
   <div class="page" id="page-camera" style="text-align:center">
-    <div style="padding:20px 0">
-      <div style="font-size:48px;margin-bottom:8px">📷</div>
-      <p style="margin-bottom:20px;color:var(--sub)">拍照识别手写笔记或布置图</p>
+    <div style="padding:20px 0"><div style="font-size:48px;margin-bottom:8px">📷</div><p style="margin-bottom:20px;color:var(--sub)">拍照识别手写笔记</p>
       <input type="file" accept="image/*" capture="environment" id="cameraInput" style="display:none" onchange="handleCamera(event)">
-      <button class="btn" onclick="document.getElementById('cameraInput').click()" style="margin-bottom:10px">📸 拍照</button>
-      <button class="btn-outline" onclick="document.getElementById('galleryInput').click()" style="display:block;width:100%">🖼️ 从相册选择</button>
+      <button class="btn" onclick="document.getElementById('cameraInput').click()">📸 拍照</button>
+      <button class="btn-outline" onclick="document.getElementById('galleryInput').click()" style="margin-top:10px">🖼️ 从相册选择</button>
       <input type="file" accept="image/*" id="galleryInput" style="display:none" onchange="handleCamera(event)">
       <div id="ocrPreview" style="margin-top:16px"></div>
     </div>
@@ -76,138 +97,88 @@ textarea.input{min-height:80px;resize:vertical;font-family:inherit}
 
   <!-- Check-in Page -->
   <div class="page" id="page-checkin">
-    <div class="card" style="text-align:center">
-      <div style="font-size:40px" id="currentTime">--:--</div>
-      <div style="color:var(--sub);margin:4px 0" id="currentDate">----年--月--日 周-</div>
-      <div id="checkinStatus" style="margin:12px 0"></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn" id="checkinBtn" onclick="doCheckin()" style="flex:1">✅ 上班打卡</button>
-        <button class="btn" id="checkoutBtn" onclick="doCheckout()" style="flex:1;background:var(--blue);display:none">🏠 下班签退</button>
-      </div>
-      <div id="todayWorkTime" style="margin-top:8px;font-size:13px;color:var(--sub)"></div>
-    </div>
-    <div class="card" style="margin-top:12px">
-      <div style="font-weight:600;margin-bottom:8px">📋 今日排班</div>
-      <div id="todaySchedule">暂无排班数据，请先导入排班表</div>
-    </div>
-    <div style="margin-top:12px"><div style="font-weight:600;margin-bottom:8px">📅 最近打卡记录</div><div id="checkinHistory"></div></div>
+    <div class="card" style="text-align:center"><div style="font-size:40px" id="currentTime">--:--</div><div style="color:var(--sub);margin:4px 0" id="currentDate"></div><div id="checkinStatus" style="margin:12px 0"></div><div style="display:flex;gap:8px"><button class="btn" id="checkinBtn" onclick="doCheckin()" style="flex:1">✅ 上班打卡</button><button class="btn" id="checkoutBtn" onclick="doCheckout()" style="flex:1;background:var(--blue);display:none">🏠 下班签退</button></div><div id="todayWorkTime" style="margin-top:8px;font-size:13px;color:var(--sub)"></div></div>
+    <div class="card" style="margin-top:12px"><div style="font-weight:600;margin-bottom:8px">📋 今日排班</div><div id="todaySchedule">暂无排班数据</div></div>
+    <div style="margin-top:12px"><div style="font-weight:600;margin-bottom:8px">📅 最近打卡</div><div id="checkinHistory"></div></div>
   </div>
 
   <!-- Reminders Page -->
   <div class="page" id="page-reminders">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <span style="font-size:14px;color:var(--sub)">定时提醒列表</span>
-      <button class="btn-sm" onclick="addReminderSheet()">➕ 添加提醒</button>
+      <span style="font-size:14px;color:var(--sub)">待办任务</span>
+      <button class="btn-sm" onclick="addReminder()">➕ 新建任务</button>
     </div>
     <div id="remindersList"></div>
-    <div class="empty-state" id="remindersEmpty"><div style="font-size:48px;margin-bottom:12px">⏰</div><p>还没有提醒</p></div>
+    <div class="empty-state" id="remindersEmpty"><div style="font-size:48px;margin-bottom:12px">⏰</div><p>还没有待办</p></div>
+    <div style="margin-top:20px"><button class="btn-outline" style="color:var(--green);border-color:var(--green)" onclick="completeAllReminders()">✅ 全部完成</button></div>
   </div>
 
   <!-- Settings Page -->
   <div class="page" id="page-settings">
-    <div class="card" style="margin-bottom:12px">
-      <div style="font-weight:600;margin-bottom:10px">📂 笔记分类管理</div>
-      <div id="categoryList" style="margin-bottom:8px"></div>
-      <div style="display:flex;gap:8px">
-        <input class="input" id="newCategoryInput" placeholder="新分类名称" style="flex:1">
-        <button class="btn-sm" onclick="addCategory()">添加</button>
-      </div>
-    </div>
-    <div class="card" style="margin-bottom:12px">
-      <div style="font-weight:600;margin-bottom:10px">📥 导入排班表 (Excel)</div>
-      <input type="file" accept=".xlsx,.xls" id="scheduleFile" style="display:none" onchange="importSchedule(event)">
-      <button class="btn-outline" onclick="document.getElementById('scheduleFile').click()" style="width:100%;margin-bottom:6px">选择 Excel 文件</button>
-      <div id="scheduleStatus" style="font-size:12px;color:var(--sub)"></div>
-    </div>
-    <div class="card" style="margin-bottom:12px">
-      <div style="font-weight:600;margin-bottom:10px">⏰ 上班时间设置</div>
-      <input class="input" type="time" id="workStartTime" value="08:00" onchange="saveSettings()">
-    </div>
-    <button class="btn-outline" onclick="addReminderSheet()" style="width:100%;margin-bottom:8px">➕ 添加提醒</button>
-    <button class="btn-outline" onclick="exportData()" style="width:100%;margin-bottom:8px;color:var(--blue);border-color:var(--blue)">📤 导出数据</button>
-    <button class="btn-outline" onclick="if(confirm('确定清除所有数据？')){clearAll()}" style="width:100%;color:var(--red);border-color:var(--red)">🗑️ 清除所有数据</button>
+    <div class="card"><div style="font-weight:600;margin-bottom:10px">📂 分类管理</div><div id="categoryList"></div><div style="display:flex;gap:8px"><input class="input" id="newCategoryInput" placeholder="新分类名称" style="flex:1"><button class="btn-sm" onclick="addCategory()">添加</button></div></div>
+    <div class="card" style="margin-top:12px"><div style="font-weight:600;margin-bottom:10px">📥 导入排班表 (Excel)</div><input type="file" accept=".xlsx,.xls" id="scheduleFile" style="display:none" onchange="importSchedule(event)"><button class="btn-outline" onclick="document.getElementById('scheduleFile').click()">选择 Excel 文件</button><div id="scheduleStatus" style="font-size:12px;color:var(--sub);margin-top:4px"></div></div>
+    <div class="card" style="margin-top:12px"><div style="font-weight:600;margin-bottom:10px">⏰ 上班时间</div><input class="input" type="time" id="workStartTime" value="08:00" onchange="saveSettings()"></div>
+    <button class="btn-outline" onclick="exportData()" style="margin-top:12px;color:var(--blue);border-color:var(--blue)">📤 导出数据</button>
+    <button class="btn-outline" onclick="if(confirm('确定清除所有数据？'))clearAll()" style="margin-top:8px;color:var(--red);border-color:var(--red)">🗑️ 清除所有数据</button>
   </div>
 
   <!-- Nav -->
-  <nav class="nav" id="nav">
-    <div class="nav-item active" data-page="notes" onclick="switchPage('notes')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h7v7H4V4zm9 0h7v7h-7V4zM4 13h7v7H4v-7zm9 3h7v4h-7v-4z"/></svg>笔记</div>
-    <div class="nav-item" data-page="camera" onclick="switchPage('camera')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="13" r="3"/><path d="M9 3h6l2 3h4v13H3V6h4z"/></svg>拍照</div>
-    <div class="nav-item" data-page="checkin" onclick="switchPage('checkin')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.4-1.4 3.6 3.6 7.6-7.6L19 8l-9 9z"/></svg>打卡</div>
-    <div class="nav-item" data-page="reminders" onclick="switchPage('reminders')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.1-1.6-5.6-4.5-6.3V4h-3v.7C7.6 5.4 6 7.9 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>提醒</div>
-    <div class="nav-item" data-page="settings" onclick="switchPage('settings')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.1 12.9a7.8 7.8 0 00.1-1.8l2.1-1.6-2-3.5-2.5 1a7 7 0 00-1.6-.9L15 3.5h-4l-.3 2.4a7 7 0 00-1.6.9l-2.5-1-2 3.5 2.1 1.6a7.8 7.8 0 00-.1 1.8l-2.1 1.6 2 3.5 2.5-1c.5.4 1 .7 1.6.9L11 21h4l.3-2.5c.6-.2 1.1-.5 1.6-.9l2.5 1 2-3.5-2.3-1.2zM12 15c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z"/></svg>设置</div>
-  </nav>
+  <nav class="nav"><div class="nav-item active" data-page="notes" onclick="switchPage('notes')"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="16" width="7" height="4"/></svg>笔记</div><div class="nav-item" data-page="camera" onclick="switchPage('camera')"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="13" r="3"/><path d="M9 3h6l2 3h4v13H3V6h4z"/></svg>拍照</div><div class="nav-item" data-page="checkin" onclick="switchPage('checkin')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-2 15l-5-5 1.4-1.4 3.6 3.6 7.6-7.6L19 8l-9 9z"/></svg>打卡</div><div class="nav-item" data-page="reminders" onclick="switchPage('reminders')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.1-1.6-5.6-4.5-6.3V4h-3v.7C7.6 5.4 6 7.9 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>提醒</div><div class="nav-item" data-page="settings" onclick="switchPage('settings')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.1 12.9a7.8 7.8 0 00.1-1.8l2.1-1.6-2-3.5-2.5 1a7 7 0 00-1.6-.9L15 3.5h-4l-.3 2.4a7 7 0 00-1.6.9l-2.5-1-2 3.5 2.1 1.6a7.8 7.8 0 00-.1 1.8l-2.1 1.6 2 3.5 2.5-1c.5.4 1 .7 1.6.9L11 21h4l.3-2.5c.6-.2 1.1-.5 1.6-.9l2.5 1 2-3.5-2.3-1.2zM12 15c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z"/></svg>设置</div></nav>
 
-  <!-- FAB - two buttons -->
-  <div id="fabContainer" style="position:fixed;bottom:110px;right:20px;z-index:50;display:flex;flex-direction:column;gap:12px;align-items:flex-end">
-    <button id="fabNote" style="width:56px;height:56px;border-radius:28px;background:var(--blue);color:#fff;border:none;font-size:24px;box-shadow:0 4px 20px rgba(10,132,255,.4);cursor:pointer" onclick="newNote()">📝</button>
-    <button id="fabFolder" style="width:56px;height:56px;border-radius:28px;background:var(--accent);color:#000;border:none;font-size:24px;box-shadow:0 4px 20px rgba(255,159,10,.4);cursor:pointer" onclick="newFolder()">📁</button>
-  </div>
+  <!-- FAB -->
+  <div class="fab-container" id="fabContainer"><button class="fab fab-note" onclick="newNote()">📝</button><button class="fab fab-folder" onclick="newFolder()">📁</button></div>
 
-  <!-- New Note Sheet -->
-  <div class="overlay" id="noteOverlay" onclick="hideNewNoteSheet()"></div>
-  <div class="sheet" id="noteSheet">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <button style="background:none;border:none;color:var(--accent);font-size:16px" onclick="hideNoteSheet()">取消</button>
-      <span style="font-weight:600">新建笔记</span>
-      <button style="background:none;border:none;color:var(--accent);font-size:16px" onclick="saveNote()">保存</button>
-    </div>
-    <input class="input" id="noteTitle" placeholder="笔记标题" style="margin-bottom:8px">
-    <textarea class="input" id="noteContent" placeholder="笔记内容..." rows="4" style="margin-bottom:8px"></textarea>
-    <div style="margin-bottom:8px">
-      <div style="font-size:12px;color:var(--sub);margin-bottom:4px">🏷️ 笔记分类</div>
-      <div id="noteCategorySelect" style="display:flex;flex-wrap:wrap;gap:4px"></div>
-    </div>
-    <div style="margin-bottom:8px">
-      <div style="font-size:12px;color:var(--sub);margin-bottom:4px">📎 图片附件</div>
-      <div id="noteImages" data-images="[]" style="min-height:40px">
-        <label style="display:inline-block;width:80px;height:80px;border:2px dashed var(--sep);border-radius:8px;cursor:pointer;text-align:center;line-height:80px;color:var(--sub);font-size:28px">
-          +<input type="file" accept="image/*" multiple style="display:none" onchange="addPics(event)">
-        </label>
-      </div>
-    </div>
-  </div>
-
-  <!-- Note Detail View (inline editable, like Apple Notes) -->
+  <!-- Note Detail Page -->
   <div class="page" id="page-note-detail" style="display:none">
     <div class="header" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px">
       <button style="background:none;border:none;color:var(--accent);font-size:16px;cursor:pointer" onclick="closeNoteDetail()">‹ 返回</button>
       <span style="font-size:11px;color:var(--sub)" id="noteDetailMeta"></span>
-      <div style="display:flex;gap:8px">
-        <button id="editBtn" style="background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer" onclick="toggleEditDetail()">编辑</button>
-        <button id="doneBtn" style="background:none;border:none;color:var(--blue);font-size:14px;font-weight:600;cursor:pointer;display:none" onclick="toggleEditDetail()">完成</button>
-        <button style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer" onclick="deleteFromDetail()">删除</button>
-      </div>
+      <div style="width:40px"></div>
     </div>
-    <div style="flex:1;overflow-y:auto;padding:20px 20px 100px;-webkit-overflow-scrolling:touch">
-      <div id="noteDetailTitle" style="font-size:24px;font-weight:700;margin-bottom:16px;line-height:1.3;outline:none;color:#fff" placeholder="标题"></div>
-      <div id="noteDetailBody" style="font-size:16px;line-height:1.8;white-space:pre-wrap;outline:none;color:var(--text);min-height:100px" placeholder="内容"></div>
-      <div id="noteDetailImages" style="margin-top:16px"></div>
+    <div style="flex:1;overflow-y:auto;padding:20px 20px 140px;-webkit-overflow-scrolling:touch">
+      <div id="noteDetailTitle" style="font-size:24px;font-weight:700;margin-bottom:16px;line-height:1.3;outline:none;color:#fff"></div>
+      <div id="noteDetailBody" style="font-size:16px;line-height:1.8;white-space:pre-wrap;outline:none;color:var(--text);min-height:100px"></div>
+      <div id="noteDetailImages"></div>
+      <div id="noteDetailFile"></div>
+    </div>
+    <!-- Bottom toolbar -->
+    <div class="bottom-toolbar" id="detailToolbar">
+      <button style="background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;padding:10px 20px" onclick="toggleEditDetail()">✏️ 编辑</button>
+      <button style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:10px 20px" onclick="deleteFromDetail()">🗑️ 删除</button>
     </div>
   </div>
 
-  <!-- Add Reminder Sheet -->
+  <!-- Note Editor Sheet -->
+  <div class="overlay" id="noteOverlay" onclick="hideNoteSheet()"></div>
+  <div class="sheet" id="noteSheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <button style="background:none;border:none;color:var(--accent);font-size:16px" onclick="hideNoteSheet()">取消</button>
+      <span style="font-weight:600">编辑笔记</span>
+      <button style="background:none;border:none;color:var(--accent);font-size:16px" onclick="saveNote()">保存</button>
+    </div>
+    <input class="input" id="noteTitle" placeholder="笔记标题" style="margin-bottom:8px">
+    <textarea class="input" id="noteContent" placeholder="笔记内容..." rows="4" style="margin-bottom:8px"></textarea>
+    <div style="margin-bottom:8px"><div style="font-size:12px;color:var(--sub);margin-bottom:4px">🏷️ 分类</div><div id="noteCategorySelect" style="display:flex;flex-wrap:wrap;gap:4px"></div></div>
+    <div style="margin-bottom:8px"><div style="font-size:12px;color:var(--sub);margin-bottom:4px">📎 图片</div><div id="noteImages" data-images="[]" style="min-height:40px"></div></div>
+    <div style="margin-bottom:8px"><div style="font-size:12px;color:var(--sub);margin-bottom:4px">📄 导入文件 (Word/PDF)</div><input type="file" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" id="fileInput" style="display:none" onchange="attachFile(event)"><button class="btn-outline" onclick="document.getElementById('fileInput').click()" style="width:100%">选择 Word 或 PDF 文件</button><div id="noteFileInfo" style="font-size:12px;color:var(--sub);margin-top:4px"></div></div>
+  </div>
+
+  <!-- Reminder Swipe Overlay -->
   <div class="overlay" id="reminderOverlay" onclick="hideReminderSheet()"></div>
   <div class="sheet" id="reminderSheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <button style="background:none;border:none;color:var(--accent);font-size:16px" onclick="hideReminderSheet()">取消</button>
-      <span style="font-weight:600">添加提醒</span>
+      <span style="font-weight:600">新建任务</span>
       <button style="background:none;border:none;color:var(--accent);font-size:16px" onclick="saveReminder()">保存</button>
     </div>
-    <input class="input" id="reminderTitle" placeholder="提醒内容" style="margin-bottom:8px">
-    <input class="input" type="time" id="reminderTime" value="08:00" style="margin-bottom:8px">
-    <select class="input" id="reminderType" style="margin-bottom:8px">
-      <option value="daily">每天</option>
-      <option value="weekday">工作日</option>
-      <option value="once">一次性</option>
-    </select>
-    <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--sub);margin-bottom:8px">
-      <input type="checkbox" id="reminderEnabled" checked> 启用
-    </label>
+    <input class="input" id="reminderTitle" placeholder="任务内容...">
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs" type="module"></script>
 <script src="app.js"></script>
 </body>
 </html>
