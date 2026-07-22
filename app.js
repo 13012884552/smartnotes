@@ -150,17 +150,38 @@ function showImagePicker(images){
 function addPics(e){const files=Array.from(e.target.files);if(!files.length)return;const c=document.getElementById('noteImages');let images=JSON.parse(c.getAttribute('data-images')||'[]');let loaded=0;files.forEach(file=>{const r=new FileReader();r.onload=ev=>{images.push(ev.target.result);loaded++;if(loaded===files.length)showImagePicker(images)};r.readAsDataURL(file)})}
 function removePic(i){const c=document.getElementById('noteImages');let images=JSON.parse(c.getAttribute('data-images')||'[]');images.splice(i,1);showImagePicker(images)}
 
-// File attachment (Word/PDF)
+// File attachment (Word/PDF) - extract text inline
 function attachFile(e){
   const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();
-  r.onload=ev=>{
+  const reader=new FileReader();
+  reader.onload=async ev=>{
     const info=document.getElementById('noteFileInfo');
     const sizeMB=(file.size/1024/1024).toFixed(1);
-    info.textContent='📄 '+file.name+' ('+sizeMB+' MB)';
-    info.setAttribute('data-file',JSON.stringify({name:file.name,type:file.type,data:ev.target.result,size:file.size}));
+    const base64=ev.target.result;
+    info.textContent='📄 '+file.name+' ('+sizeMB+' MB) - 正在提取内容...';
+    info.setAttribute('data-file',JSON.stringify({name:file.name,type:file.type,data:base64,size:file.size}));
+
+    // Extract text from Word/PDF for inline display
+    try{
+      if(file.name.endsWith('.docx')&&typeof mammoth!=='undefined'){
+        const raw=atob(base64.split(',')[1]);const bytes=new Uint8Array(raw.length);
+        for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+        const result=await mammoth.extractRawText({arrayBuffer:bytes.buffer});
+        const text=result.value.trim();
+        if(text){
+          const content=document.getElementById('noteContent');
+          content.value=(content.value+'\\n\\n--- '+file.name+' ---\\n'+text).trim();
+          info.textContent='📄 '+file.name+' ('+sizeMB+' MB) - 内容已提取到正文';
+        }
+      }else if(file.name.endsWith('.pdf')){
+        // For PDF, show preview in detail; text extraction needs pdf.js
+        info.textContent='📄 '+file.name+' ('+sizeMB+' MB) - PDF已附加，点击笔记查看';
+      }
+    }catch(ex){
+      info.textContent='📄 '+file.name+' ('+sizeMB+' MB) - 已附加（内容提取失败）';
+    }
   };
-  r.readAsDataURL(file);
+  reader.readAsDataURL(file);
 }
 
 async function saveNote(){
@@ -211,36 +232,36 @@ function renderDetailView(note){
   const imgs=note.images||(note.image?[note.image]:[]);
   document.getElementById('noteDetailImages').innerHTML=imgs.length?imgs.map(img=>'<img src="'+img+'" onclick="fullImg(this.src)" style="width:100%;border-radius:12px;margin:6px 0;max-height:400px;object-fit:contain;background:#111;cursor:pointer">').join(''):'';
 
-  // File preview
+  // File preview - render inline
   const fileDiv=document.getElementById('noteDetailFile');
-  if(note.fileName){
-    fileDiv.innerHTML='<div style="font-size:13px;color:var(--sub);margin:10px 0">📄 '+esc(note.fileName)+'<span style="margin-left:8px;font-size:11px;color:var(--blue);cursor:pointer" onclick="downloadFile('+viewingNoteId+')">下载</span></div>';
-    // Render file content
-    if(note.fileData){
+  if(note.fileName&&note.fileData){
+    try{
       const raw=atob(note.fileData.split(',')[1]||'');
       const bytes=new Uint8Array(raw.length);
       for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-      const blob=new Blob([bytes],{type:note.fileType||'application/octet-stream'});
 
       if(note.fileName.endsWith('.docx')){
-        fileDiv.innerHTML+='<div class="file-preview" id="filePreview"><div style="color:var(--sub)">加载中...</div></div>';
+        fileDiv.innerHTML='<div class="file-preview" id="fp">📄 '+esc(note.fileName)+'<br><span style="color:var(--sub)">加载中...</span></div>';
         if(typeof mammoth!=='undefined'){
-          mammoth.convertToHtml({arrayBuffer:blob.arrayBuffer()}).then(r=>{
-            document.getElementById('filePreview').innerHTML=r.value||'(空文档)';
+          mammoth.convertToHtml({arrayBuffer:bytes.buffer}).then(r=>{
+            document.getElementById('fp').innerHTML='<div style="font-size:14px;line-height:1.7">'+esc(note.fileName)+'</div><div style="border-top:1px solid var(--sep);margin:10px 0"></div>'+(r.value||'<span style="color:var(--sub)">(空文档)</span>');
           }).catch(()=>{
-            document.getElementById('filePreview').innerHTML='<span style="color:var(--sub)">Word 文件，点击上方下载查看</span>';
+            document.getElementById('fp').innerHTML='<span style="color:var(--sub)">📄 '+esc(note.fileName)+' - 无法预览</span>';
           });
         }
       }else if(note.fileName.endsWith('.pdf')){
-        fileDiv.innerHTML+='<div class="file-preview" id="filePreview"><div style="color:var(--sub)">加载中...</div></div>';
+        const blob=new Blob([bytes],{type:'application/pdf'});
         const url=URL.createObjectURL(blob);
-        document.getElementById('filePreview').innerHTML='<iframe src="'+url+'" style="width:100%;height:500px;border:none;border-radius:8px" onerror="this.style.display=\'none\'"></iframe><div style="text-align:center;color:var(--sub);font-size:12px">无法加载请点击上方下载查看</div>';
-      }else{
-        const url=URL.createObjectURL(blob);
-        fileDiv.innerHTML+='<div class="file-preview"><a href="'+url+'" download="'+esc(note.fileName)+'" style="color:var(--blue)">点击打开文件</a></div>';
+        fileDiv.innerHTML='<div style="font-size:14px;margin:10px 0">📄 '+esc(note.fileName)+'</div><iframe src="'+url+'" style="width:100%;height:500px;border:none;border-radius:8px;background:#fff"></iframe>';
       }
+    }catch(e){
+      fileDiv.innerHTML='<div style="color:var(--sub)">📄 '+esc(note.fileName)+'</div>';
     }
-  }else{fileDiv.innerHTML=''}
+  }else if(note.fileName){
+    fileDiv.innerHTML='<div style="color:var(--sub)">📄 '+esc(note.fileName)+'</div>';
+  }else{
+    fileDiv.innerHTML='';
+  }
 
   document.getElementById('detailToolbar').style.display='flex';
 }
@@ -265,12 +286,12 @@ async function toggleEditDetail(){
   }
 }
 function closeNoteDetail(){
-  if(isEditingDetail) toggleEditDetail();
+  viewingNoteId=null;isEditingDetail=false;
   document.getElementById('page-note-detail').style.display='none';
   document.getElementById('page-note-detail').classList.remove('active');
   document.getElementById('nav').style.display='flex';
   document.getElementById('headerTitle').style.display='';
-  viewingNoteId=null;isEditingDetail=false;
+  const fab=document.getElementById('fabContainer');if(fab)fab.classList.remove('hidden');
   switchPage('notes');
 }
 function deleteFromDetail(){if(viewingNoteId&&confirm('确定删除？')){sdel('notes',viewingNoteId);viewingNoteId=null;closeNoteDetail()}}
