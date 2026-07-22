@@ -214,12 +214,31 @@ function renderDetailView(note){
   // File preview
   const fileDiv=document.getElementById('noteDetailFile');
   if(note.fileName){
-    fileDiv.innerHTML='<div style="font-size:13px;color:var(--sub);margin:10px 0">📄 '+esc(note.fileName)+'</div>';
-    // Render file content if possible
-    if(note.fileType==='application/pdf'||note.fileName.endsWith('.pdf')){
-      fileDiv.innerHTML+='<div style="padding:12px;background:var(--card);border-radius:var(--radius);text-align:center;color:var(--sub)">📕 PDF 文件<br><span style="font-size:12px">已保存为附件，可在编辑中重新下载</span></div>';
-    }else if(note.fileName.endsWith('.docx')){
-      fileDiv.innerHTML+='<div style="padding:12px;background:var(--card);border-radius:var(--radius);text-align:center;color:var(--sub)">📘 Word 文件<br><span style="font-size:12px">已保存为附件，可在编辑中重新下载</span></div>';
+    fileDiv.innerHTML='<div style="font-size:13px;color:var(--sub);margin:10px 0">📄 '+esc(note.fileName)+'<span style="margin-left:8px;font-size:11px;color:var(--blue);cursor:pointer" onclick="downloadFile('+viewingNoteId+')">下载</span></div>';
+    // Render file content
+    if(note.fileData){
+      const raw=atob(note.fileData.split(',')[1]||'');
+      const bytes=new Uint8Array(raw.length);
+      for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+      const blob=new Blob([bytes],{type:note.fileType||'application/octet-stream'});
+
+      if(note.fileName.endsWith('.docx')){
+        fileDiv.innerHTML+='<div class="file-preview" id="filePreview"><div style="color:var(--sub)">加载中...</div></div>';
+        if(typeof mammoth!=='undefined'){
+          mammoth.convertToHtml({arrayBuffer:blob.arrayBuffer()}).then(r=>{
+            document.getElementById('filePreview').innerHTML=r.value||'(空文档)';
+          }).catch(()=>{
+            document.getElementById('filePreview').innerHTML='<span style="color:var(--sub)">Word 文件，点击上方下载查看</span>';
+          });
+        }
+      }else if(note.fileName.endsWith('.pdf')){
+        fileDiv.innerHTML+='<div class="file-preview" id="filePreview"><div style="color:var(--sub)">加载中...</div></div>';
+        const url=URL.createObjectURL(blob);
+        document.getElementById('filePreview').innerHTML='<iframe src="'+url+'" style="width:100%;height:500px;border:none;border-radius:8px" onerror="this.style.display=\'none\'"></iframe><div style="text-align:center;color:var(--sub);font-size:12px">无法加载请点击上方下载查看</div>';
+      }else{
+        const url=URL.createObjectURL(blob);
+        fileDiv.innerHTML+='<div class="file-preview"><a href="'+url+'" download="'+esc(note.fileName)+'" style="color:var(--blue)">点击打开文件</a></div>';
+      }
     }
   }else{fileDiv.innerHTML=''}
 
@@ -256,6 +275,7 @@ function closeNoteDetail(){
 }
 function deleteFromDetail(){if(viewingNoteId&&confirm('确定删除？')){sdel('notes',viewingNoteId);viewingNoteId=null;closeNoteDetail()}}
 function fullImg(src){const d=document.createElement('div');d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:999;display:flex;align-items:center;justify-content:center';d.innerHTML='<img src="'+src+'" style="max-width:100%;max-height:100%;object-fit:contain">';d.onclick=()=>d.remove();document.body.appendChild(d)}
+async function downloadFile(id){const note=await sget('notes',id);if(!note||!note.fileData)return;const a=document.createElement('a');a.href=note.fileData;a.download=note.fileName||'file';a.click()}
 
 // ========= CAMERA / OCR =========
 async function handleCamera(e){
