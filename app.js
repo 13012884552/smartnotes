@@ -48,14 +48,13 @@ async function renderNotes(){
     const cats=await sall('categories');
     const query=(document.getElementById('searchInput')?.value||'').trim().toLowerCase();
 
-    // Breadcrumb
+    // Breadcrumb + Category filter
     let bc='<span class="tag selected" onclick="navigateToFolder(null)">🏠 全部</span>';
     if(currentFolder){
       const ancestors=await getPath(currentFolder);
       ancestors.forEach(f=>{bc+=' <span style="color:var(--sub)">›</span> <span class="tag" onclick="navigateToFolder('+f.id+')">'+esc(f.name)+'</span>'});
     }
-    // Category filter tags
-    let catHTML='<div style="display:flex;gap:6px;overflow-x:auto;padding:8px 0;flex-wrap:wrap">';
+    let catHTML='<div style="display:flex;gap:6px;overflow-x:auto;flex-wrap:wrap">';
     catHTML+=cats.map(c=>'<span class="tag" onclick="filterByCat('+c.id+')">'+esc(c.name)+'</span>').join('');
     catHTML+='</div>';
     document.getElementById('categoryFilter').innerHTML=bc+catHTML;
@@ -73,7 +72,9 @@ async function renderNotes(){
       html+=folders.map(f=>'<div class="swipe-wrapper"><div class="swipe-content card" style="cursor:pointer;display:flex;align-items:center;gap:10px;margin-bottom:0" onclick="navigateToFolder('+f.id+')"><div style="font-size:24px">📁</div><div style="flex:1;font-weight:500">'+esc(f.name)+'</div></div><div class="swipe-delete" onclick="deleteFolder('+f.id+')">删除</div></div>').join('');
     }
     if(notes.length){
-      html+='<div style="font-size:12px;color:var(--sub);margin:12px 0 8px">📝 笔记 '+(query?'('+notes.length+'条)'+(cats.length?'':' ('+notes.length+'条)')):'')+'</div>';
+      var noteLabel='📝 笔记';
+      if(query)noteLabel+=' ('+notes.length+'条)';
+      html+='<div style="font-size:12px;color:var(--sub);margin:12px 0 8px">'+noteLabel+'</div>';
       html+=notes.map(n=>{
         const imgs=n.images||(n.image?[n.image]:[]);
         const cat=cats.find(c=>c.id===n.categoryId);
