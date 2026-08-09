@@ -1,12 +1,11 @@
-const CACHE = 'smartnotes-v7';
+const CACHE = 'smartnotes-v11';
 const ASSETS = [
   '/',
   'index.html',
   'app.js',
   'manifest.json',
   'icon-192.png',
-  'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
-  'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  'https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js',
 ];
 
 self.addEventListener('install', e => {
